@@ -58,7 +58,7 @@
 
 ## 構成
 
-`index.html` 1ファイルで動きます。ビルドや外部ライブラリは不要です（フォントのみGoogle Fontsから読み込みます）。
+`index.html` 1ファイルで動きます（ファビコン画像 `favicon.svg`・`favicon.ico`・`apple-touch-icon.png` を同じフォルダに置きます）。ビルドや外部ライブラリは不要です（フォントのみGoogle Fontsから読み込みます）。
 
 ## 免責
 
