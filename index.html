@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>カルスNC-R施用量計算</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --bg:#f3f5f1;
+  --surface:#ffffff;
+  --surface-2:#e8ede5;
+  --ink:#1b2620;
+  --ink-2:#4d5c53;
+  --line:#cfd8cf;
+  --leaf:#2f6b4f;
+  --leaf-soft:#dcebe2;
+  --bran:#a57a12;
+  --bran-soft:#f5ead0;
+  --warn:#9a3b1f;
+  --warn-soft:#f7e3da;
+  --radius:10px;
+  --font:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#131a16;--surface:#1b241f;--surface-2:#222d27;--ink:#e6ede8;--ink-2:#a4b3aa;
+    --line:#34423a;--leaf:#7cc39d;--leaf-soft:#20382b;--bran:#e0b64a;--bran-soft:#3a2f14;
+    --warn:#f0a488;--warn-soft:#3d2219;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#131a16;--surface:#1b241f;--surface-2:#222d27;--ink:#e6ede8;--ink-2:#a4b3aa;
+  --line:#34423a;--leaf:#7cc39d;--leaf-soft:#20382b;--bran:#e0b64a;--bran-soft:#3a2f14;
+  --warn:#f0a488;--warn-soft:#3d2219;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:22px}
+header{display:grid;gap:4px;padding-top:6px}
+.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--leaf);font-weight:700}
+h1{margin:0;font-size:clamp(24px,6vw,32px);font-weight:900;line-height:1.3;text-wrap:balance}
+.lead{margin:0;color:var(--ink-2);font-size:14px}
+h2{margin:0 0 10px;font-size:17px;font-weight:700;text-wrap:balance}
+section{display:grid;gap:10px}
+
+/* 入力 */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:grid;gap:16px}
+.field{display:grid;gap:6px}
+.label{font-size:13px;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+.area-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.area-row input{flex:1 1 120px;min-width:0;font:600 22px var(--mono);padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.seg label{flex:1;position:relative}
+.seg input{position:absolute;opacity:0;inset:0}
+.seg span{display:block;text-align:center;padding:9px 14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.seg input:checked + span{background:var(--leaf);color:var(--surface);font-weight:700}
+.seg input:focus-visible + span{outline:2px solid var(--bran);outline-offset:-2px}
+.hint{font-size:12px;color:var(--ink-2);margin:0}
+.checks{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer}
+.check input{margin-top:5px;width:18px;height:18px;accent-color:var(--leaf);flex:none}
+.check b{display:block;font-weight:700}
+.check small{display:block;color:var(--ink-2);font-size:12px;line-height:1.5}
+.check:has(input:checked){border-color:var(--leaf);background:var(--leaf-soft)}
+.toggle{display:flex;gap:10px;align-items:center;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--leaf);flex:none}
+.toggles{display:grid;gap:8px}
+
+/* 結果 */
+.summary{font-size:13px;color:var(--ink-2);margin:0}
+.summary strong{color:var(--ink)}
+.rows{display:grid;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:12px 16px;border-top:1px solid var(--line);align-items:baseline}
+.row:first-child{border-top:0}
+.row .name{font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row .val{font:600 20px var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.row .val small{font:500 13px var(--font);color:var(--ink-2);margin-left:3px}
+.row .note{grid-column:1 / -1;font-size:12px;color:var(--ink-2);line-height:1.6}
+.row .sub{grid-column:2;text-align:right;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;margin-top:-4px}
+.chip{font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;letter-spacing:.04em}
+.chip.req{background:var(--leaf-soft);color:var(--leaf)}
+.chip.cond{background:var(--bran-soft);color:var(--bran)}
+.row.hero{background:var(--leaf-soft)}
+.row.hero .val{font-size:26px;color:var(--leaf)}
+.row.empty{color:var(--ink-2);font-size:13px;display:block}
+
+.alerts{display:grid;gap:8px}
+.alert{padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6;background:var(--warn-soft);color:var(--ink);border-left:3px solid var(--warn)}
+.alert b{color:var(--warn)}
+.alert.info{background:var(--bran-soft);border-left-color:var(--bran)}
+.alert.info b{color:var(--bran)}
+
+/* 手順 */
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:0;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:32px 1fr;gap:12px;padding-bottom:14px;position:relative}
+ol.steps li::before{content:counter(s);width:32px;height:32px;border-radius:50%;background:var(--leaf);color:var(--surface);display:grid;place-items:center;font:600 14px var(--mono)}
+ol.steps li:not(:last-child)::after{content:"";position:absolute;left:15px;top:34px;bottom:2px;width:2px;background:var(--line)}
+ol.steps b{display:block}
+ol.steps span{font-size:13px;color:var(--ink-2)}
+
+ul.points{margin:0;padding-left:1.2em;display:grid;gap:6px;font-size:14px}
+ul.points li::marker{color:var(--leaf)}
+footer{font-size:12px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:12px}
+footer p{margin:0 0 4px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">土づくり ／ 微生物資材</div>
+  <h1>カルスNC-R 施用量計算</h1>
+  <p class="lead">面積と有機物の種類を選ぶと、カルスNC-R・米ヌカ・有機物・硫安の量を計算します。基準はメーカー（リサール酵産）の10aあたり目安です。</p>
+</header>
+
+<section aria-labelledby="h-input">
+  <h2 id="h-input">条件</h2>
+  <div class="panel">
+    <div class="field">
+      <span class="label">ほ場面積</span>
+      <div class="area-row">
+        <input id="area" type="number" inputmode="decimal" min="0" step="0.1" value="15" aria-label="面積">
+        <div class="seg" role="radiogroup" aria-label="面積の単位">
+          <label><input type="radio" name="unit" id="unit-a" value="a" checked><span>a（アール）</span></label>
+          <label><input type="radio" name="unit" id="unit-m2" value="m2"><span>m²</span></label>
+        </div>
+      </div>
+      <p class="hint" id="area-hint"></p>
+    </div>
+
+    <div class="field">
+      <span class="label">栽培形態</span>
+      <div class="seg" role="radiogroup" aria-label="栽培形態">
+        <label><input type="radio" name="house" id="house-in" value="in" checked><span>施設（ハウス）</span></label>
+        <label><input type="radio" name="house" id="house-out" value="out"><span>露地</span></label>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">すき込む有機物（複数可）</span>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="om-residue" value="residue" checked><div><b>作物残さ</b><small>前作の茎葉・根　全量</small></div></label>
+        <label class="check"><input type="checkbox" id="om-sorghum" value="sorghum"><div><b>緑肥（ソルゴー）</b><small>全量</small></div></label>
+        <label class="check"><input type="checkbox" id="om-husk" value="husk"><div><b>生モミガラ</b><small>1 t／10a・硫安が必要</small></div></label>
+        <label class="check"><input type="checkbox" id="om-manure" value="manure"><div><b>畜ふん生堆肥</b><small>オガクズ・チップ・モミガラ入り　5〜7 t／10a</small></div></label>
+      </div>
+    </div>
+
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="jas"><span>有機JASで栽培する（硫安を使えない）</span></label>
+      <label class="toggle"><input type="checkbox" id="highec"><span>土壌ECが高い・残肥が多い</span></label>
+      <label class="toggle"><input type="checkbox" id="disinfect"><span>土壌消毒・石灰窒素を使う予定がある</span></label>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-result">
+  <h2 id="h-result">必要量</h2>
+  <p class="summary" id="summary"></p>
+  <div class="rows" id="rows"></div>
+  <div class="alerts" id="alerts"></div>
+</section>
+
+<section aria-labelledby="h-steps">
+  <h2 id="h-steps">施用の手順</h2>
+  <ol class="steps">
+    <li><div><b>有機物をまく</b><span id="step1">残さ・緑肥・モミガラ・堆肥をほ場全面に広げます。</span></div></li>
+    <li><div><b>カルスNC-Rと米ヌカを均一にまく</b><span id="step2">硫安（または代替資材）を使う場合も同時にまきます。</span></div></li>
+    <li><div><b>速やかにロータリーですき込む</b><span>まいたら時間をおかずにすき込みます。</span></div></li>
+    <li><div><b>1〜3週間あけて作付け</b><span id="step4">すき込み後、分解を待ってから定植します。</span></div></li>
+  </ol>
+</section>
+
+<section aria-labelledby="h-points">
+  <h2 id="h-points">注意点</h2>
+  <ul class="points">
+    <li>生モミガラを使うときは窒素補給が必須です。硫安などを入れないと生育不良や窒素飢餓になるとメーカーは注意しています。</li>
+    <li>塩基濃度が高いハウスで硫安を控えめにして失敗したイチゴの例もあります。減らす場合は土壌診断の数値を根拠にしてください。</li>
+    <li>ECが高い、または肥料分が多く残るほ場では資材量を減らす調整が必要です。施用前の土壌診断をおすすめします。</li>
+    <li>基肥は作物に応じて通常どおり施用します。</li>
+    <li>土壌消毒の後は薬剤の効果が消えるまで期間をあけます。石灰窒素は殺菌作用があるため十分な間隔をとり、その他の石灰類も同時混用は避けます。</li>
+  </ul>
+</section>
+
+<footer>
+  <p>出典：リサール酵産（カルスNC-R）農業用施用基準。数値は10aあたりの目安で、ほ場条件により調整が必要です。</p>
+  <p>袋数は10kg袋で計算し、切り上げて表示しています。</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  // 10aあたり基準（kg）
+  const CALUS = { in:[30,40], out:[20,30] };
+  const BRAN = [200,300];
+  const OM = {
+    residue:{ name:"作物残さ（前作）", whole:true, n:false, decomp:"1〜2ヵ月" },
+    sorghum:{ name:"緑肥（ソルゴー）", whole:true, n:false, decomp:null },
+    husk:   { name:"生モミガラ", kg:[1000,1000], n:true, decomp:"6〜10ヵ月" },
+    manure: { name:"畜ふん生堆肥", kg:[5000,7000], n:false, decomp:null }
+  };
+  const AMMONIUM = [40,40];
+  const JAS_ALT = { cake:[180,220], bran:[450,500] };
+
+  const $ = id => document.getElementById(id);
+  const inputs = ["area","unit-a","unit-m2","house-in","house-out","om-residue","om-sorghum","om-husk","om-manure","jas","highec","disinfect"];
+
+  const fmt = v => {
+    if (v >= 1000) return (v/1000).toLocaleString("ja-JP",{maximumFractionDigits:2}) ;
+    return v.toLocaleString("ja-JP",{maximumFractionDigits: v < 10 ? 1 : 0});
+  };
+  // 範囲表示。1t以上はt表記
+  function range(r, f){
+    const lo = r[0]*f, hi = r[1]*f;
+    const unit = hi >= 1000 ? "t" : "kg";
+    const a = fmt(lo), b = fmt(hi);
+    const txt = (a === b) ? a : a + "〜" + b;
+    return txt + "<small>" + unit + "</small>";
+  }
+  function row(o){
+    return '<div class="row' + (o.hero ? ' hero' : '') + '">' +
+      '<div class="name">' + o.name + (o.chip ? ' <span class="chip ' + o.chip[0] + '">' + o.chip[1] + '</span>' : '') + '</div>' +
+      '<div class="val">' + o.val + '</div>' +
+      (o.sub ? '<div class="sub">' + o.sub + '</div>' : '') +
+      (o.note ? '<div class="note">' + o.note + '</div>' : '') +
+      '</div>';
+  }
+
+  function calc(){
+    const unit = $("unit-m2").checked ? "m2" : "a";
+    let raw = parseFloat($("area").value);
+    if (!isFinite(raw) || raw < 0) raw = 0;
+    const areaA = unit === "m2" ? raw/100 : raw;
+    const f = areaA / 10; // 10a比
+    const house = $("house-out").checked ? "out" : "in";
+    const jas = $("jas").checked;
+    const selected = Object.keys(OM).filter(k => $("om-" + k).checked);
+    const needN = selected.some(k => OM[k].n);
+
+    $("area-hint").textContent = areaA > 0
+      ? "= " + areaA.toLocaleString("ja-JP",{maximumFractionDigits:2}) + " a（10aの " + f.toLocaleString("ja-JP",{maximumFractionDigits:3}) + " 倍）"
+      : "面積を入力してください。";
+
+    $("summary").innerHTML = "<strong>" + areaA.toLocaleString("ja-JP",{maximumFractionDigits:2}) + " a</strong>・" +
+      (house === "in" ? "施設" : "露地") + "・" +
+      (selected.length ? selected.map(k => OM[k].name).join("＋") : "有機物未選択") +
+      (jas ? "・有機JAS" : "");
+
+    let html = "";
+    // カルス
+    const c = CALUS[house];
+    const bags = [Math.ceil(c[0]*f/10), Math.ceil(c[1]*f/10)];
+    html += row({ hero:true, name:"カルスNC-R", chip:["req","必須"], val: range(c,f),
+      sub: "10kg袋 " + (bags[0] === bags[1] ? bags[0] : bags[0] + "〜" + bags[1]) + " 袋",
+      note: "基準 " + c[0] + "〜" + c[1] + " kg／10a（" + (house === "in" ? "施設野菜・花卉" : "露地") + "）" });
+    // 米ヌカ
+    html += row({ name:"米ヌカ（増量材）", chip:["req","必須"], val: range(BRAN,f),
+      note:"基準 200〜300 kg／10a。有機物の種類にかかわらず施用します。" });
+
+    // 有機物
+    if (!selected.length){
+      html += '<div class="row empty">有機物を1つ以上選んでください。</div>';
+    }
+    selected.forEach(k => {
+      const o = OM[k];
+      const notes = [];
+      if (o.kg) notes.push("基準 " + (o.kg[0] === o.kg[1] ? fmt(o.kg[0]) : fmt(o.kg[0]) + "〜" + fmt(o.kg[1])) + " t／10a");
+      notes.push(o.n ? "硫安などの窒素補給が必要" : "硫安は不要");
+      if (o.decomp) notes.push("分解期間 " + o.decomp);
+      html += row({ name:o.name, chip:["req","有機物"], val: o.whole ? "全量" : range(o.kg,f), note: notes.join("・") });
+    });
+
+    // 窒素補給
+    if (needN){
+      if (!jas){
+        html += row({ name:"硫安（C/N比調整）", chip:["cond","条件付き"], val: range(AMMONIUM,f),
+          note:"生モミガラを使うため必要です。基準 40 kg／10a。" });
+      } else {
+        html += row({ name:"菜種油粕（硫安の代わり）", chip:["cond","いずれか"], val: range(JAS_ALT.cake,f),
+          note:"有機JASの場合。基準 180〜220 kg／10a。" });
+        html += row({ name:"米ヌカ（硫安の代わり）", chip:["cond","いずれか"], val: range(JAS_ALT.bran,f),
+          note:"有機JASの場合。基準 450〜500 kg／10a。増量材の米ヌカ200〜300kgとの関係（別途加算か込みか）はメーカー資料で確認してください。" });
+      }
+    }
+    html += row({ name:"基肥", chip:["cond","通常どおり"], val:"作物に応じて", note:"カルスNC-R施用時も基肥は通常どおり施用するのが基本です。" });
+    $("rows").innerHTML = html;
+
+    // 注意表示
+    const al = [];
+    if ($("highec").checked) al.push('<div class="alert"><b>資材量の調整が必要です。</b>ECが高い・肥料分が多く残るほ場では資材量を減らします。上の数値は標準量なので、土壌診断の結果をもとに減らしてください。</div>');
+    if (needN && $("highec").checked) al.push('<div class="alert"><b>窒素補給は削りすぎないでください。</b>塩基濃度が高いハウスで硫安を控えめにして失敗したイチゴの例があります。生モミガラを使う場合、窒素不足は窒素飢餓につながります。</div>');
+    if ($("disinfect").checked) al.push('<div class="alert"><b>土壌消毒と間隔をあけてください。</b>薬剤の効果が消えてから施用します。石灰窒素は殺菌作用があるため十分な間隔をとり、その他の石灰類も同時に混ぜないでください。</div>');
+    if (selected.includes("husk")) al.push('<div class="alert info"><b>生モミガラは分解に6〜10ヵ月かかります。</b>作付けまでの期間を逆算して、早めにすき込んでください。</div>');
+    $("alerts").innerHTML = al.join("");
+
+    // 手順の補足
+    $("step2").textContent = needN
+      ? (jas ? "菜種油粕または追加の米ヌカも同時にまきます。" : "硫安も同時にまきます。")
+      : "今回の組み合わせでは硫安は不要です。";
+    const dec = selected.map(k => OM[k].decomp ? OM[k].name + "は分解に" + OM[k].decomp : null).filter(Boolean);
+    $("step4").textContent = "すき込み後、分解を待ってから定植します。" + (dec.length ? "（" + dec.join("、") + "）" : "");
+
+    try { localStorage.setItem("calus-inputs", JSON.stringify(inputs.reduce((o,id)=>{const e=$(id);o[id]=e.type==="number"?e.value:e.checked;return o;},{}))); } catch(e){}
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("calus-inputs") || "null");
+    if (saved) inputs.forEach(id => { if (id in saved){ const e=$(id); if (e.type==="number") e.value=saved[id]; else e.checked=saved[id]; } });
+  } catch(e){}
+
+  // 単位を切り替えたら数値も換算する
+  $("unit-a").addEventListener("change", () => { const v=parseFloat($("area").value); if (isFinite(v)) $("area").value = +(v/100).toFixed(2); });
+  $("unit-m2").addEventListener("change", () => { const v=parseFloat($("area").value); if (isFinite(v)) $("area").value = Math.round(v*100); });
+
+  inputs.forEach(id => { $(id).addEventListener("input", calc); $(id).addEventListener("change", calc); });
+  calc();
+})();
+</script>
+</body>
+</html>
